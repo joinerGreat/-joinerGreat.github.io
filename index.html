@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>安踏宣传页three.js 仿制版本</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+</head>
+<body>
+<script type="text/javascript" src="./js/three.js"></script>
+<!-- <script type="text/javascript" src="./js/es6-shim.js"></script>
+<script type="text/javascript" src="./js/OrbitControls.js"></script> -->
+<!-- <script type="text/javascript" src="./js/DeviceOrientationControls.js"></script> -->
+<script type="text/javascript" src="./js/webvr-polyfill.js"></script>
+<script type="text/javascript" src="./js/VRControls.js"></script>
+<script type="text/javascript" src="./js/VREffect.js"></script>
+<script type="text/javascript" src="./js/webvr-manager.js"></script>
+<script type="text/javascript" src="./js/Tween.js"></script>
+<script type="text/javascript" src="./js/stats.min.js"></script>
+
+
+<style type="text/css">
+    body{background:url('./images/bg.jpg')}
+	*{margin:0;padding:0;}
+	canvas{display:block;}
+	#log{position: absolute;top: 0;right: 0;}
+</style>
+<div id="log"></div>
+<script type="text/javascript">
+	/*****
+	 *	 * @autor       huadulin  huadulin@ctvit.com.cn
+	 *	 * @email       shenyuxiaoyao@gmail.com
+	 *	 * @leader      zhikenan  zhikenan@ctvit.com.cn
+	 *	 * @cooperator  zhouminghui  zhouminghui@ctvit.com.cn
+	 *   * @warning     if have any problems , please solve by yourself
+	 *   * @log         ...5.8  添加背景层，修复透明bug ，修复orbitControls 点击关闭按钮启动bug
+	 *   *              ...5.9  更换为VRControls
+	 *   *              ...5.10 解决拖动触发点击事件问题  解决移动端重力感应问题  改为oop思路
+	 *****/
+
+	 //创建基本变量
+
+	 var scene , camera , renderer , controls  , effect , manager, btnR=[] , modal ,bgMesh ,timer=null ;
+
+	 var loader=new THREE.TextureLoader();
+
+	 var scene_root=new THREE.Object3D();
+
+	 var mouse=new THREE.Vector2();
+
+	 var raycaster=new THREE.Raycaster();
+
+	 var isClick=true;
+
+	 var isDrag=false;
+
+	 var btnPos=[
+
+	       {x:32,y:8.5,z:30,r:1},
+	       {x:45,y:-10,z:0,r:0.4},
+	       {x:30,y:-25,z:25,r:1},
+	       {x:25,y:8,z:25,r:1},
+	       {x:50,y:-10,z:65,r:0},
+	       {x:72,y:-25,z:1,r:0},
+	       {x:78,y:6,z:2,r:2.5},
+	       {x:98,y:0,z:35,r:1.5},
+	       {x:68,y:-6,z:65,r:0},
+	       {x:88,y:-6,z:60,r:1}
+	 ];
+
+   
+
+	 //创建平面
+
+	 function createPlane(url,width,height,parent){
+
+        var geometry=new THREE.PlaneGeometry(width,height);
+
+        var material=new THREE.MeshBasicMaterial( {map: loader.load(url), side: THREE.DoubleSide,transparent:true} );
+
+        var plane=new THREE.Mesh(geometry,material);
+
+        if(parent){
+
+         parent.add(plane);
+
+        }
+
+        return plane;
+	 }
+
+	 //创建圆柱体
+
+     function createCyLinder(url,r1,r2,h,parent){
+
+     	var parent=parent || scene_root;
+
+        var geometry=new THREE.CylinderGeometry(r1,r2,h,32,32,true);
+
+        var material=new THREE.MeshBasicMaterial( {map: loader.load(url),transparent:true} );
+
+        var cylinder=new THREE.Mesh(geometry,material);
+
+        parent.add(cylinder);
+
+        return cylinder;
+	 }
+
+	  //创建球体
+
+     function creatSphere(url,r,parent){
+
+     	var parent=parent || scene_root;
+
+        var geometry=new THREE.SphereGeometry(r,80,80);
+
+        var material=new THREE.MeshBasicMaterial( {map: loader.load(url), side: THREE.DoubleSide,transparent:true} );
+
+        var sphere=new THREE.Mesh(geometry,material);
+
+        parent.add(sphere);
+
+        return sphere;
+	 }
+
+	 //创建弹层
+
+	 function createModal(tU,cU,bU){
+
+	   modal=new THREE.Group();
+
+	   //背景
+
+	   bgMesh=new THREE.Mesh(new THREE.PlaneGeometry(window.innerWidth,window.innerHeight),new THREE.MeshBasicMaterial({color:0x000000,side:THREE.DoubleSide,opacity:0.5,transparent:true}));
+
+	   bgMesh.renderOrder=200;
+
+	   bgMesh.position.z=-10;
+
+	   camera.add(bgMesh);
+
+	   //关闭按钮
+
+	   var closeMesh=createPlane("./images/layer/btn_close.png",0.5,0.5);
+
+	   btnR.splice(10,1);
+
+	   closeMesh.position.set(3.5,0.85,-4);
+
+	   closeMesh.type="close";
+
+	   closeMesh.renderOrder=300;
+
+	   btnR.push(closeMesh);
+
+	   //上部画卷
+   
+       var topMesh=createPlane("./images/layer/layer_s1_top.png",10,1);
+
+       topMesh.position.set(0,0,-4);
+
+       topMesh.renderOrder=300;
+
+       //中部具体文件
+
+       var centerMesh=createPlane("./images/layer/layer_s1_bg.png",10,1);
+
+       centerMesh.renderOrder=300;
+
+       var c1=createPlane(tU,5.6,0.3);
+
+       var c2=createPlane(cU,5.6,0.4);
+
+       var c3=createPlane(bU,5.6,0.1);
+
+        c1.position.set(0,0.28,0);
+
+        c1.renderOrder=350;
+
+        c2.position.set(0,-0.08,0);
+
+        c2.renderOrder=350;
+
+        c3.position.set(0,-0.35,0);
+
+        c3.renderOrder=350;
+
+       centerMesh.add(c1);
+
+       centerMesh.add(c2);
+
+       centerMesh.add(c3);
+
+       centerMesh.position.set(0,-1,-4);
+
+       //底部画卷
+
+       var bottomMesh=createPlane("./images/layer/layer_s1_bottom.png",10,1);
+
+       bottomMesh.position.set(0,-2,-4);
+
+       bottomMesh.renderOrder=300;
+
+       modal.add(closeMesh);
+
+       modal.add(topMesh);
+
+       modal.add(centerMesh);
+
+       modal.add(bottomMesh);
+
+       modal.scale.set(.8,.8,.8);
+
+       modal.position.set(0,4,-6);
+
+       camera.add(modal);
+
+       var tween=new TWEEN.Tween(centerMesh.scale).to({y:10},1000).start();
+
+       var tween1=new TWEEN.Tween(centerMesh.position).to({y:-5.5},1000).start();
+
+       var tween2=new TWEEN.Tween(bottomMesh.position).to({y:-11},1000).start();
+
+	 }
+
+
+	  //初始化方法
+
+	 function init(){
+
+	 	scene=new THREE.Scene();
+
+	 	scene.add(scene_root);
+
+	 	camera=new THREE.PerspectiveCamera(75 , window.innerWidth/window.innerHeight , 0.1 , 500);
+
+	 	camera.position.z=220;
+
+	 	scene.add(camera);
+
+	 	renderer=new THREE.WebGLRenderer({ antialias: true , alpha: true});
+
+	 	renderer.setPixelRatio( window.devicePixelRatio );
+
+	 	renderer.setSize(window.innerWidth,window.innerHeight);
+
+	 	document.body.appendChild(renderer.domElement);
+
+    	//创建圆柱体
+
+		var cylinder = createCyLinder('./images/content.png' ,40 ,40 ,90 );
+
+		cylinder.scale.x=-1;
+
+		cylinder.rotation.y=-6;
+
+		scene_root.position.x=100;
+
+		//添加btn
+
+		 btnG=new THREE.Group();
+
+		 btnG.position.set(-60,15,-35);
+
+		 btnG.visible=false;
+
+		 cylinder.add(btnG);
+
+		var obtn=createPlane("./images/btn/btn_aminate_icon.png",5,5);
+
+		for(var i=0;i<10;i++){
+
+			var btn=obtn.clone();
+
+			btn.type="button";
+
+			 btnG.add(btn);
+
+			 btn.renderOrder=100;
+
+			 btn.rotation.y=btnPos[i].r;
+
+			 btn.name="btn_"+i;
+
+			 btn.position.set(btnPos[i].x,btnPos[i].y,btnPos[i].z);
+
+		     btnR.push(btn);
+
+			 var tweenHead = new TWEEN.Tween(btn.scale)
+
+				.to({ x: 0.8, y: 0.8 ,z:1}, 500);
+
+			var tweenBack = new TWEEN.Tween(btn.scale)
+
+				.to({ x: 1, y: 1 ,z:1}, 500);
+
+			tweenHead.chain(tweenBack);
+
+			tweenBack.chain(tweenHead);
+
+			tweenHead.start();
+		}
+
+
+
+
+		//执行载入动画
+
+		var startTween=new TWEEN.Tween({x:scene_root.position.x,z:camera.position.z})
+
+		.to({x:0,z:16},3000).onUpdate(function(){
+
+			 scene_root.position.x=this.x;
+
+			 scene_root.rotation.y=this.y;
+
+			 camera.position.z=this.z;
+
+		}).start();
+
+
+		var loadTween=new TWEEN.Tween(scene_root.rotation).to({y:Math.PI*4},5000).onComplete(function(){  
+            
+            btnG.visible=true;
+
+			controls = new THREE.VRControls(camera);
+
+	        effect = new THREE.VREffect(renderer);
+
+	        effect.setSize(window.innerWidth, window.innerHeight);
+
+	        manager = new WebVRManager(renderer, effect, {"hideButton":true});
+
+
+		}).start();
+
+		window.addEventListener( 'resize', function () {
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+		}, false );
+
+	    
+	    var isHorinzontal=true;
+
+		window.addEventListener( 'deviceorientation', function (e) {
+
+			if(e.beta < 30 && isHorinzontal){
+
+				WebVRConfig = {
+						
+							YAW_ONLY: true // Default: false.
+									
+						}
+
+			}else {
+
+				isHorinzontal=false;
+
+                WebVRConfig = {
+						
+							YAW_ONLY: false // Default: false.
+									
+						}
+
+			}
+
+		}, false );
+
+       	if(/AppleWebKit.*mobile/i.test(navigator.userAgent) || (/MIDP|SymbianOS|NOKIA|SM|LG|NEC|TCL|Alcatel|BIRD|DBTEL|Dopod|PHILIPS|HAIER|LENOVO|MOT-|Nokia|SonyEricsson|SIE-|Amoi|ZTE/.test(navigator.userAgent))){
+
+       		window.addEventListener('touchstart',onTouchstart,false);
+
+       		window.addEventListener('touchmove',function(e){e.preventDefault()},false);
+
+		}else{
+
+			window.addEventListener('mousedown', onMousedown, false );
+
+		}
+	
+		
+
+		function onTouchstart(event){
+
+	        var sourceX=event.touches[0].clientX;
+
+			window.addEventListener('touchend',function(e){
+		
+				var disX=e.changedTouches[0].clientX;
+
+				var disY=e.changedTouches[0].clientY;
+
+				if(sourceX != disX){
+
+					isDrag=true;
+
+				}else{
+
+					isDrag=false;
+				}
+
+				mouse.x= (disX/window.innerWidth)*2-1;
+
+				mouse.y=-(disY/window.innerHeight)*2+1;
+
+				raycaster.setFromCamera(mouse , camera);
+	    
+	            var intersects=raycaster.intersectObjects( btnR );
+
+	            if(intersects.length >0 && !isDrag){
+
+	            	var targetObj=intersects[0].object;
+
+	            	var type=targetObj.type;
+
+	            	if(type === "button" && isClick){
+
+		            	createModal("./images/layer/faner_video.jpg","./images/layer/faner_product.png" ,"./images/layer/btn_buy.png");
+
+		            	controls.enableRotate = false;
+
+		            	isClick=false;
+
+	            	}else if(type === "close" && !isClick){
+
+	            		 isClick=true;
+
+	                     controls.enableRotate = true;
+
+		            	  btnR.splice(10,1);
+
+	                      camera.remove(modal);
+
+	                      camera.remove(bgMesh);
+
+	            	}
+	            }
+
+			},false);
+
+		}
+
+
+		function onMousedown(event){
+
+			event.preventDefault();
+
+			var sourceX=event.clientX;
+
+			window.addEventListener('mouseup',function(e){
+
+				if(sourceX !=e.clientX){
+
+					isDrag=true;
+
+				}else{
+
+					isDrag=false;
+				}
+
+				mouse.x= (e.clientX/window.innerWidth)*2-1;
+
+				mouse.y=-(e.clientY/window.innerHeight)*2+1;
+
+				raycaster.setFromCamera(mouse , camera);
+	    
+	            var intersects=raycaster.intersectObjects( btnR );
+
+	            if(intersects.length >0 && !isDrag){
+
+	            	var targetObj=intersects[0].object;
+
+	            	var type=targetObj.type;
+
+	            	if(type === "button" && isClick){
+
+		            	createModal("./images/layer/faner_video.jpg","./images/layer/faner_product.png" ,"./images/layer/btn_buy.png");
+
+		            	controls.enableRotate = false;
+
+		            	isClick=false;
+
+	            	}else if(type === "close" && !isClick){
+
+	            		 isClick=true;
+
+	                     controls.enableRotate = true;
+
+		            	  btnR.splice(10,1);
+
+	                      camera.remove(modal);
+
+	                      camera.remove(bgMesh);
+
+	            	}
+	            }
+
+			},false);
+		}
+
+
+		//添加性能监控
+
+		 stats = new Stats();
+
+         stats.domElement.style.position = 'absolute';
+
+         stats.domElement.style.bottom = '0px';
+
+         document.body.appendChild(stats.domElement);
+
+	 }
+
+	 //渲染方法
+
+	 function render(){
+
+	 	requestAnimationFrame(render);
+
+	 	stats.update();
+
+	 	TWEEN.update();
+
+	 	if(controls){
+
+	 		 controls.update();
+
+	 		 manager.render(scene, camera);
+
+	 	}else{
+
+	 		renderer.render( scene, camera );
+
+	 	}	
+
+	 }
+
+	 //调用方法
+
+	 init();
+
+	 render();
+
+</script>
+</body>
+</html>
